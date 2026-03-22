@@ -282,6 +282,19 @@ graph TB
 - 换实现只需要改入口类的一行代码
 - 各层之间解耦，更灵活
 
+**代码解读**：
+
+结合 `Application.java` 可以按以下顺序理解入口代码：
+
+1. 先创建 `WmsDataStore`，作为系统运行期间共享的内存数据仓库。
+2. 再创建 `LogService` 和 `PersistenceService`，让系统具备日志记录和数据持久化能力。
+3. 调用 `persistenceService.initialize()` 与 `persistenceService.loadAll()`，完成目录初始化和历史数据加载。
+4. 基于 `dataStore`、`logService`、`persistenceService` 继续创建 `AuthService`、`ProductService`、`InventoryService`、`UserService`。
+5. 创建 `Scanner`，作为控制台输入入口，供后续各个控制器共用。
+6. 创建 `LoginController`、`ProductController`、`StockController`、`UserController`，把它们所需的服务对象注入进去。
+7. 最后创建 `MainController`，统一接管登录、菜单跳转、日志查看和退出保存等主流程。
+8. 调用 `mainController.start()` 后，程序才真正进入业务运行阶段。
+
 **核心要点**：
 
 - 入口类负责完成 `WmsDataStore`、Service 和 Controller 的创建与装配。
@@ -372,6 +385,26 @@ user.setRole(Role.ADMIN);
 Role role = user.getRole(); // 类型安全
 ```
 
+**代码示例讲解**：
+
+实体层建议优先结合 `Product.java` 讲解，因为它既包含商品主数据，也直接承载库存相关字段。
+
+可以按以下顺序理解：
+
+1. `id`、`name`、`category`：描述商品是谁，属于商品主数据。
+2. `price`：描述商品单价，体现业务中的金额属性。
+3. `stock`、`alertStock`：描述当前库存和预警阈值，体现库存管理特征。
+4. `status`：说明商品是否仍可参与业务流转。
+5. `lastModified`：记录最近一次修改时间，便于排序和展示。
+6. `copy()`：返回当前对象的副本，避免外部直接修改仓库中的原始数据。
+7. `isActive()`：把状态判断封装为一个语义明确的方法，便于上层调用。
+
+通过 `Product.java` 可以帮助学生建立一个认识：
+
+- 实体类不是随意堆字段
+- 每个字段都对应具体业务含义
+- 一个实体类往往就是一个核心业务对象的程序表达
+
 **核心要点**：
 
 - 实体类对应的是业务对象，而不是数据库表。
@@ -414,6 +447,24 @@ if (Role.ADMIN.equals(user.getRole())) {  // 拼写错误编译器会报错
     // ...
 }
 ```
+
+**代码示例讲解**：
+
+枚举层建议优先结合 `Role.java` 讲解，因为它最容易和权限控制、菜单分流联系起来。
+
+可以按以下顺序理解：
+
+1. 枚举常量 `ADMIN`、`OPERATOR`：表示系统中允许出现的角色范围。
+2. `displayName`：保存角色中文名称，用于界面展示。
+3. 构造方法 `Role(String displayName)`：为每个枚举常量绑定展示名称。
+4. `getDisplayName()`：让控制层在打印菜单或欢迎语时直接获取中文角色名。
+5. `fromString(String text)`：把外部输入或文件中的文本转换为枚举值。
+
+通过 `Role.java` 可以说明：
+
+- 枚举不仅能限定取值范围
+- 枚举还可以带字段、带方法、带转换逻辑
+- 它本质上是“有固定实例的特殊类”
 
 **核心要点**：
 
@@ -476,6 +527,28 @@ graph LR
 - 每个控制器专注一块业务
 - 职责清晰，易于理解
 - 修改某块业务不影响其他部分
+
+**代码示例讲解**：
+
+控制层建议优先结合 `MainController.java` 讲解，因为它最能体现“流程调度”的职责。
+
+可以按以下顺序理解：
+
+1. `start()`：先展示登录前菜单，并根据用户输入决定“登录系统”还是“安全退出”。
+2. `handleLogin()`：调用 `LoginController` 完成登录，若成功则拿到当前用户对象，若失败则直接提示错误信息。
+3. `handleMainMenu(currentUser)`：登录成功后，根据当前用户角色进入不同主菜单。
+4. `resolvePermission(currentUser)`：把当前用户角色转换成对应的权限策略对象。
+5. `processAdminChoice(...)` / `processOperatorChoice(...)`：根据菜单编号，把请求分发给商品、库存、用户、日志等模块控制器。
+6. `safeSaveBeforeExit()`：在程序退出前补做一次保存，避免用户刚完成修改就直接退出导致数据未落盘。
+
+通过这一段代码可以看出，`MainController` 真正负责的是：
+
+- 菜单展示
+- 流程跳转
+- 角色分流
+- 模块调度
+
+而库存是否足够、商品是否存在、文件如何保存，这些都不是控制层决定的，而是继续交给服务层处理。
 
 **核心要点**：
 
@@ -616,6 +689,23 @@ graph TB
     style D fill:#ffe1e1
 ```
 
+**代码示例讲解**：
+
+权限策略层建议优先结合 `PermissionPolicy.java` 与 `AdminPermissionPolicy.java` / `OperatorPermissionPolicy.java` 一起讲。
+
+可以按以下顺序理解：
+
+1. `PermissionPolicy` 先定义统一能力接口，例如 `canManageUser()`、`canViewLogs()`。
+2. `AdminPermissionPolicy` 让这些方法大多返回 `true`，表示管理员拥有完整权限。
+3. `OperatorPermissionPolicy` 只保留库存相关能力，用户管理、商品管理、日志查看返回 `false`。
+4. 控制层拿到策略对象后，不需要再关心角色名称，只需要调用 `policy.canXXX()`。
+
+通过这组代码可以说明：
+
+- 角色判断被抽离成独立策略对象
+- 控制层不直接依赖具体角色分支
+- 新增角色时，只需新增新的权限实现类
+
 **核心要点**：
 
 - 不同角色的权限不同，如果在各处都写 `if-else` 判断，代码会迅速变得重复且难以维护。
@@ -717,6 +807,26 @@ graph TB
    - 登录校验
    - 权限判断（能不能做某操作）
 
+**代码示例讲解**：
+
+服务层建议优先结合 `InventoryServiceImpl.java` 讲解，因为它最能体现业务规则、校验、回滚和落盘的完整闭环。
+
+可以按以下顺序理解：
+
+1. `stockIn(...)` 与 `stockOut(...)`：两个公开方法只是入口，最终都会汇总到 `changeStock(...)`。
+2. `changeStock(...)` 开头先做商品存在性、商品状态、数量、备注长度等校验。
+3. 计算 `beforeStock` 和 `afterStock`，并在出库场景下判断库存是否足够。
+4. 调用 `snapshotProducts()` 和 `snapshotStockRecords()`，在修改前先保留快照。
+5. 修改商品库存、更新时间，并创建 `StockRecord` 流水对象。
+6. 调用 `persistenceService.saveProducts()` 和 `persistenceService.saveStockRecords()` 完成持久化。
+7. 如果保存失败，则恢复快照并抛出异常；如果成功，则写入日志并返回记录副本。
+
+通过 `InventoryServiceImpl.java` 可以帮助学生理解：
+
+- 服务层是业务规则真正落地的地方
+- “校验 -> 修改 -> 记录 -> 保存 -> 回滚/成功” 是完整业务链路
+- 控制层不写这些规则，是为了保持职责分离
+
 **核心要点**：
 
 - 服务层分为接口与实现两部分。
@@ -804,6 +914,25 @@ graph TB
     style F fill:#e1ffe1
 ```
 
+**代码示例讲解**：
+
+数据存储层建议优先结合 `WmsDataStore.java` 讲解，因为它把项目中最核心的集合结构都集中展示出来了。
+
+可以按以下顺序理解：
+
+1. `usersByUsername`：使用 `Map`，因为登录需要按用户名快速定位用户。
+2. `productsById`：使用 `Map`，因为商品管理需要按编号快速查询。
+3. `stockRecords`：使用 `List`，因为库存记录天然有时间顺序。
+4. `stockRecordsByProductId`：额外维护“商品编号 -> 记录列表”的索引，便于按商品查询历史流水。
+5. `snapshotUsers()`、`snapshotProducts()`、`snapshotStockRecords()`：提供深拷贝快照，支持回滚。
+6. `replaceUsers(...)`、`replaceProducts(...)`、`replaceStockRecords(...)`：用于在加载数据或回滚时整体替换内存状态。
+
+通过 `WmsDataStore.java` 可以帮助学生理解：
+
+- 内存数据不是随便放的，而是按访问模式设计集合结构
+- 数据仓库层解决的是“怎么存、怎么取、怎么恢复”
+- 它服务于业务层，但不直接写业务规则
+
 **核心要点**：
 
 为什么用户和商品用 Map，记录用 List？
@@ -860,6 +989,24 @@ graph TB
     style G fill:#e1f5ff
     style H fill:#e1f5ff
 ```
+
+**代码示例讲解**：
+
+工具层建议优先结合 `FileUtil.java` 讲解，因为它最能体现“公共能力复用”的价值。
+
+可以按以下顺序理解：
+
+1. `ensureDirectory(...)`、`ensureFile(...)`：负责准备目录和文件，避免后续读写时报路径不存在。
+2. `readLines(...)`、`writeLines(...)`、`appendLines(...)`：封装统一的 UTF-8 文件读写逻辑。
+3. `escape(...)` 与 `unescape(...)`：处理 `|`、`=`、`\` 等特殊字符，保证文本格式可逆。
+4. `parseKeyValueLine(...)`：把一行文本解析为 `key -> value` 结构，供持久化层恢复实体对象。
+5. `buildKeyValueLine(...)`：把字段集合重新序列化成一行文本，用于写回文件。
+
+通过 `FileUtil.java` 可以说明：
+
+- 工具类负责抽出公共技术细节
+- 业务层不必重复处理底层文件格式
+- 统一工具方法后，项目的读写逻辑会更稳定、更容易维护
 
 **核心要点**：
 
