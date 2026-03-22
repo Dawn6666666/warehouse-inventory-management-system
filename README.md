@@ -1,10 +1,17 @@
 # 仓库进销存管理系统
 
 <div align="center">
-**一个基于 JavaSE 的分层式仓库管理系统**
+  <p><strong>一个基于 JavaSE 的分层式仓库管理系统</strong></p>
 
-[![JDK](https://img.shields.io/badge/JDK-17+-blue.svg)](https://www.oracle.com/java/)
-[![License](https://img.shields.io/badge/License-Educational-green.svg)](LICENSE)
+  <p>
+    <a href="https://www.oracle.com/java/">
+      <img src="https://img.shields.io/badge/JDK-17+-blue.svg" alt="JDK">
+    </a>
+    <a href="./LICENSE">
+      <img src="https://img.shields.io/badge/License-Educational-green.svg" alt="License">
+    </a>
+  </p>
+</div>
 
 ---
 
